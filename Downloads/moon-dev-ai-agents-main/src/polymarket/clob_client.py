@@ -38,8 +38,39 @@ class ClobClient:
     def _url(self, path: str) -> str:
         return f"{self.base}{path}"
 
+    def get_simplified_markets(self, limit: int = 100) -> List[Dict[str, Any]]:
+        """GET /simplified-markets -> returns list of markets with token IDs and prices.
+
+        This is the primary read-only endpoint for market discovery from CLOB.
+        Returns market data including condition_id, tokens with prices, and status.
+        """
+        url = self._url('/simplified-markets')
+        resp = self.session.get(url, timeout=10)
+        resp.raise_for_status()
+        data = resp.json()
+        # API returns {"data": [...]}
+        return data.get('data', []) if isinstance(data, dict) else data
+
+    def get_markets(self, limit: int = 100, next_cursor: str = None) -> Dict[str, Any]:
+        """GET /markets -> returns detailed market data with pagination.
+
+        Returns dict with 'data' (list of markets) and 'next_cursor' for pagination.
+        More detailed than simplified-markets, includes order book settings, fees, etc.
+        """
+        url = self._url('/markets')
+        params = {}
+        if next_cursor:
+            params['next_cursor'] = next_cursor
+        resp = self.session.get(url, params=params, timeout=10)
+        resp.raise_for_status()
+        return resp.json()
+
     def get_price(self, token_id: str, side: str) -> Dict[str, Any]:
-        """GET /price?token_id=<ID>&side=BUY|SELL -> returns parsed JSON"""
+        """GET /price?token_id=<ID>&side=BUY|SELL -> returns parsed JSON.
+
+        NOTE: This endpoint may return {"error": "Invalid token id"} for inactive markets.
+        Consider using get_simplified_markets() to get current prices instead.
+        """
         assert side in ('BUY', 'SELL')
         url = self._url('/price')
         resp = self.session.get(url, params={'token_id': token_id, 'side': side}, timeout=5)
@@ -47,7 +78,10 @@ class ClobClient:
         return resp.json()
 
     def get_prices(self, requests_list: List[Dict[str, str]]) -> List[Dict[str, Any]]:
-        """POST /prices with body list of {token_id, side} -> returns list of quotes"""
+        """POST /prices with body list of {token_id, side} -> returns list of quotes.
+
+        NOTE: May return empty results for inactive markets.
+        """
         url = self._url('/prices')
         headers = {'Content-Type': 'application/json'}
         resp = self.session.post(url, headers=headers, data=json.dumps(requests_list), timeout=10)
@@ -55,14 +89,21 @@ class ClobClient:
         return resp.json()
 
     def get_book(self, token_id: str) -> Dict[str, Any]:
-        """GET /book?token_id=<ID> -> returns book summary"""
+        """GET /book?token_id=<ID> -> returns book summary.
+
+        NOTE: This endpoint may return {"error": "Invalid token id"} for inactive markets.
+        Only works for markets that are actively accepting orders.
+        """
         url = self._url('/book')
         resp = self.session.get(url, params={'token_id': token_id}, timeout=5)
         resp.raise_for_status()
         return resp.json()
 
     def get_books(self, token_ids: List[str]) -> List[Dict[str, Any]]:
-        """POST /books with body list of token_ids -> returns list of books"""
+        """POST /books with body list of token_ids -> returns list of books.
+
+        NOTE: May return errors for inactive markets.
+        """
         url = self._url('/books')
         headers = {'Content-Type': 'application/json'}
         body = [{'token_id': tid} for tid in token_ids]
