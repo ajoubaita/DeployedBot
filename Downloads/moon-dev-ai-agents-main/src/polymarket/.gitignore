@@ -1,0 +1,28 @@
+# Environment files with secrets
+.env
+.env.local
+.env.production
+
+# Private keys and credentials
+*.key
+*.pem
+credentials.json
+
+# Trading logs with potentially sensitive data
+data/live_trades.json
+data/real_trades.json
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
