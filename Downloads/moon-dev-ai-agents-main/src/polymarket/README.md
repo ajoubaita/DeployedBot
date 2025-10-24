@@ -13,7 +13,8 @@ When a market is about to resolve, informed traders create volume spikes. By det
 
 ## ✅ What's Working RIGHT NOW
 
-- ✅ **Real Polymarket integration** - Monitoring 199+ active markets
+- ✅ **Real Polymarket integration** - Monitoring 418+ active markets (all available)
+- ✅ **High-frequency trading optimized** - Covers $10K-$100K volume range + high volume markets
 - ✅ **Volume spike detection** - Tracks historical baselines and detects 3x-5x spikes
 - ✅ **Signal strength calculation** - Combines volume/price/deadline (0-100 score)
 - ✅ **Paper trading mode** - Risk-free testing with P&L tracking
@@ -30,7 +31,9 @@ When a market is about to resolve, informed traders create volume spikes. By det
 5. will-2-fed-rate-cuts-happen-in-2025      $2.1M
 ```
 
-**Total: 199 open markets tracked**
+**Total: 418+ markets tracked across all volume tiers**
+- **297 high volume markets** (>$100K)
+- **121 target range markets** ($10K-$100K) - HFT sweet spot
 
 ---
 

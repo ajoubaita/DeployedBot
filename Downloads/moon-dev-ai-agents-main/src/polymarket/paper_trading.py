@@ -24,13 +24,9 @@ import os
 try:
     from polymarket.gamma_client import GammaClient
     from polymarket.clob_client import ClobClient
-    from polymarket.arbitrage_detector import ArbitrageDetector, ArbitrageOpportunity
-    from polymarket.agent_integration import AgentIntegrator
 except ImportError:
     from gamma_client import GammaClient
     from clob_client import ClobClient
-    from arbitrage_detector import ArbitrageDetector, ArbitrageOpportunity
-    from agent_integration import AgentIntegrator
 
 
 @dataclass
@@ -131,37 +127,51 @@ class PaperTradingEngine:
 
         return available >= position_size
 
-    def simulate_trade_entry(self, opportunity: ArbitrageOpportunity) -> Optional[SimulatedTrade]:
+    def execute_trade(self, market_id: str, market_slug: str, outcome: str,
+                     entry_price: float, position_size: float, expected_roi: float,
+                     confidence: float, reasoning: str) -> Optional[SimulatedTrade]:
         """
-        Simulate entering a trade.
+        Execute a simulated trade (volume spike compatible).
 
         Args:
-            opportunity: The arbitrage opportunity
+            market_id: Market identifier
+            market_slug: Human-readable market name
+            outcome: YES/NO
+            entry_price: Entry price for position
+            position_size: Size in USDC
+            expected_roi: Expected return on investment percentage
+            confidence: Confidence score (0-100)
+            reasoning: Why we're taking this trade
 
         Returns:
             SimulatedTrade if successful, None if insufficient balance
         """
-        if not self.can_trade(opportunity.position_size_usd):
-            print(f"  ✗ Insufficient balance for ${opportunity.position_size_usd:,.2f} trade")
+        if not self.can_trade(position_size):
+            print(f"  ✗ Insufficient balance for ${position_size:,.2f} trade")
             return None
+
+        # Calculate shares and expected profit
+        shares = position_size / entry_price
+        expected_profit = position_size * (expected_roi / 100)
+        costs = position_size * 0.02  # 2% vig
 
         # Create simulated trade
         trade = SimulatedTrade(
-            trade_id=f"trade_{len(self.session.open_positions) + len(self.session.closed_positions) + 1}",
+            trade_id=f"paper_{int(time.time())}_{len(self.session.open_positions) + 1}",
             timestamp=datetime.now(),
-            market_id=opportunity.market_id,
-            market_slug=opportunity.market_slug,
-            outcome=opportunity.outcome,
-            entry_price=opportunity.current_price,
-            position_size=opportunity.position_size_usd,
-            shares=opportunity.position_size_usd / opportunity.current_price,
-            expected_payout=opportunity.expected_payout,
-            expected_profit=opportunity.net_profit,
-            costs=opportunity.vig_cost + opportunity.gas_cost,
+            market_id=market_id,
+            market_slug=market_slug,
+            outcome=outcome,
+            entry_price=entry_price,
+            position_size=position_size,
+            shares=shares,
+            expected_payout=shares * 1.0,  # Assume resolves to $1
+            expected_profit=expected_profit - costs,
+            costs=costs,
             status='open',
-            roi_percent=opportunity.roi_percent,
-            certainty_score=opportunity.certainty_score,
-            reasoning=opportunity.reasoning
+            roi_percent=expected_roi,
+            certainty_score=confidence / 100.0,
+            reasoning=reasoning
         )
 
         # Add to open positions
@@ -179,7 +189,7 @@ class PaperTradingEngine:
         print(f"Shares: {trade.shares:,.2f}")
         print(f"Expected Profit: ${trade.expected_profit:,.2f}")
         print(f"Expected ROI: {trade.roi_percent:.1f}%")
-        print(f"Certainty: {trade.certainty_score * 100:.0f}%")
+        print(f"Confidence: {trade.certainty_score * 100:.0f}%")
         print(f"Reasoning: {trade.reasoning}")
         print(f"{'='*70}\n")
 
@@ -355,186 +365,3 @@ class PaperTradingEngine:
         return d
 
 
-class PaperTradingMonitor:
-    """
-    Combines arbitrage detection with paper trading execution.
-    """
-
-    def __init__(self, starting_balance: float = 10000.0):
-        """
-        Initialize paper trading monitor.
-
-        Args:
-            starting_balance: Starting USDC balance
-        """
-        self.gamma = GammaClient()
-        self.clob = ClobClient()
-        self.detector = ArbitrageDetector()
-        self.integrator = AgentIntegrator()
-        self.engine = PaperTradingEngine(starting_balance=starting_balance)
-
-        self.check_count = 0
-
-    def run_check_cycle(self):
-        """Run a single monitoring and trading cycle."""
-        self.check_count += 1
-
-        print(f"\n{'='*70}")
-        print(f"PAPER TRADING CHECK #{self.check_count} - {datetime.now().strftime('%H:%M:%S')}")
-        print(f"{'='*70}\n")
-
-        try:
-            # 1. Fetch markets
-            print("Fetching markets...")
-            clob_markets = self.clob.get_simplified_markets()
-
-            # Filter for open markets
-            open_markets = [
-                m for m in clob_markets
-                if not m.get('closed') and not m.get('archived')
-            ]
-
-            print(f"  ✓ Found {len(open_markets)} open markets\n")
-
-            if not open_markets:
-                print("No open markets available\n")
-                return
-
-            # Limit for performance
-            open_markets = open_markets[:50]
-
-            # 2. Scan for opportunities (using mock certainty for now)
-            print("Scanning for arbitrage opportunities...")
-            opportunities = []
-
-            for market in open_markets:
-                tokens = market.get('tokens', [])
-                if len(tokens) != 2:
-                    continue
-
-                # Add mock data
-                market['volume'] = 50000
-                market['liquidity'] = 15000
-                market['slug'] = market.get('question', 'unknown-market')[:60]
-
-                # Look for extreme prices (potential opportunities)
-                for token in tokens:
-                    price = token.get('price', 0.5)
-                    outcome = token.get('outcome', '')
-
-                    # Only consider if price suggests opportunity
-                    if 'yes' in outcome.lower() and 0.50 <= price <= 0.75:
-                        # Mock certainty (in production, this comes from event detection)
-                        certainty_info = {
-                            'type': 'mock',
-                            'game_status': 'SIMULATED',
-                            'source': 'Paper Trading Test'
-                        }
-
-                        opp = self.detector.detect_opportunity(
-                            market=market,
-                            event_outcome=outcome,
-                            event_timestamp=datetime.now(),
-                            certainty_info=certainty_info
-                        )
-
-                        if opp and opp.roi_percent >= 20:
-                            opportunities.append(opp)
-
-            print(f"  ✓ Found {len(opportunities)} potential opportunities\n")
-
-            if not opportunities:
-                print("No opportunities meet criteria\n")
-                return
-
-            # 3. Validate with AI agents
-            print("Validating with AI agents...")
-            validated = self.integrator.validate_multiple_opportunities(
-                opportunities,
-                max_to_approve=3  # Max 3 trades per cycle
-            )
-
-            print(f"  ✓ {len(validated)} opportunities approved\n")
-
-            # 4. Execute paper trades
-            for v in validated:
-                if self.engine.can_trade(v.opportunity.position_size_usd):
-                    self.engine.simulate_trade_entry(v.opportunity)
-                else:
-                    print(f"  ⚠ Skipping trade - insufficient balance")
-
-        except Exception as e:
-            print(f"Error in check cycle: {e}")
-            import traceback
-            traceback.print_exc()
-
-    def run(self, num_cycles: int = 5, delay_seconds: int = 10):
-        """
-        Run paper trading for multiple cycles.
-
-        Args:
-            num_cycles: Number of check cycles to run
-            delay_seconds: Seconds between cycles
-        """
-        print(f"\n{'='*70}")
-        print(f"STARTING PAPER TRADING SESSION")
-        print(f"{'='*70}")
-        print(f"Cycles: {num_cycles}")
-        print(f"Delay: {delay_seconds}s between cycles")
-        print(f"Starting Balance: ${self.engine.session.starting_balance:,.2f}")
-        print(f"{'='*70}\n")
-
-        try:
-            for i in range(num_cycles):
-                self.run_check_cycle()
-
-                # Show current status
-                self.engine.print_performance()
-
-                if i < num_cycles - 1:
-                    print(f"Waiting {delay_seconds}s before next check...\n")
-                    time.sleep(delay_seconds)
-
-            # Auto-resolve any open positions at end
-            if self.engine.session.open_positions:
-                print(f"\nSession ending, resolving {len(self.engine.session.open_positions)} open positions...")
-                self.engine.simulate_auto_resolve()
-
-            # Final summary
-            print(f"\n{'='*70}")
-            print(f"PAPER TRADING SESSION COMPLETE")
-            print(f"{'='*70}\n")
-            self.engine.print_performance()
-
-            print(f"Trade log saved to: {self.engine.log_file}\n")
-
-        except KeyboardInterrupt:
-            print(f"\n\nSession interrupted by user")
-            self.engine.print_performance()
-
-
-def main():
-    """Run paper trading session."""
-    print("\n" + "="*70)
-    print("  POLYMARKET PAPER TRADING SYSTEM")
-    print("="*70)
-    print("\nThis simulates trades without real money to test the system.")
-    print("Starting balance: $10,000 (simulated)")
-    print("\nThe system will:")
-    print("  1. Monitor real Polymarket markets")
-    print("  2. Detect arbitrage opportunities")
-    print("  3. Validate with AI agents")
-    print("  4. Execute simulated trades")
-    print("  5. Track P&L and performance")
-    print("\nPress Ctrl+C to stop early")
-    print("="*70 + "\n")
-
-    # Create monitor
-    monitor = PaperTradingMonitor(starting_balance=10000.0)
-
-    # Run for 5 cycles (about 1 minute)
-    monitor.run(num_cycles=5, delay_seconds=10)
-
-
-if __name__ == '__main__':
-    main()

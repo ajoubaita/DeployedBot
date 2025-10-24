@@ -19,10 +19,8 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-try:
-    from polymarket.arbitrage_detector import ArbitrageOpportunity
-except ImportError:
-    from arbitrage_detector import ArbitrageOpportunity
+# ArbitrageOpportunity removed - old arbitrage strategy
+# Volume spike bot uses direct parameters instead
 
 
 class AuthenticatedTrader:
@@ -160,7 +158,7 @@ class AuthenticatedTrader:
             print(f"Error checking balance: {e}")
             return 0.0
 
-    def execute_trade(self, opportunity: ArbitrageOpportunity) -> Optional[Dict]:
+    def execute_trade(self, opportunity) -> Optional[Dict]:  # Type: ArbitrageOpportunity (removed for now)
         """
         Execute a trade for an arbitrage opportunity.
 
@@ -175,7 +173,7 @@ class AuthenticatedTrader:
         else:
             return self._execute_live_trade(opportunity)
 
-    def _execute_paper_trade(self, opportunity: ArbitrageOpportunity) -> Dict:
+    def _execute_paper_trade(self, opportunity) -> Dict:  # Type: ArbitrageOpportunity (removed for now)
         """Execute simulated trade."""
         print(f"\n{'='*70}")
         print(f"[PAPER] SIMULATED TRADE EXECUTION")
@@ -200,7 +198,7 @@ class AuthenticatedTrader:
             'timestamp': datetime.now().isoformat()
         }
 
-    def _execute_live_trade(self, opportunity: ArbitrageOpportunity) -> Optional[Dict]:
+    def _execute_live_trade(self, opportunity) -> Optional[Dict]:  # Type: ArbitrageOpportunity (removed for now)
         """Execute REAL trade with real money."""
         if not self.client:
             print(f"⚠️  Cannot execute live trade - client not initialized")

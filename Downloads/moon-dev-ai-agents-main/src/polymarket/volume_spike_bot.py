@@ -105,11 +105,11 @@ class VolumeSpikeBot:
         """
         print(f"[{datetime.now().strftime('%H:%M:%S')}] Fetching markets...")
 
-        # Get open markets from Gamma (has volume data)
+        # Get ALL open markets from Gamma (for high-frequency trading)
         markets = self.gamma.filter_markets(
             active_only=True,
             open_only=True,
-            limit=200
+            limit=10000  # Get all markets for HFT
         )
 
         # Filter for markets with volume data
@@ -118,7 +118,14 @@ class VolumeSpikeBot:
             if m.get('volume') is not None and m.get('volume') > 0
         ]
 
+        # Categorize by volume tier for HFT optimization
+        high_volume = [m for m in markets_with_volume if m.get('volume', 0) > 100000]
+        target_range = [m for m in markets_with_volume if 10000 <= m.get('volume', 0) <= 100000]
+
         print(f"  ✓ {len(markets_with_volume)} markets with volume data found")
+        print(f"    • High volume (>$100K): {len(high_volume)} markets")
+        print(f"    • Target range ($10K-$100K): {len(target_range)} markets")
+        print(f"    • Total HFT targets: {len(high_volume) + len(target_range)} markets")
 
         return markets_with_volume
 
@@ -186,33 +193,17 @@ class VolumeSpikeBot:
 
             try:
                 if self.paper_trading:
-                    # Convert VolumeSpike to ArbitrageOpportunity format
-                    # Paper trading expects ArbitrageOpportunity object
-                    from polymarket.arbitrage_detector import ArbitrageOpportunity
-
-                    # Create pseudo opportunity from spike
-                    opp = ArbitrageOpportunity(
+                    # Execute paper trade directly (no ArbitrageOpportunity needed)
+                    trade = self.trader.execute_trade(
                         market_id=spike.market_id,
                         market_slug=spike.market_slug,
-                        condition_id=spike.market_id,  # Use market_id as condition
-                        token_id=spike.token_id,
                         outcome=spike.outcome,
-                        current_price=spike.current_price,
-                        target_price=1.0 if spike.current_price < 0.5 else 0.0,
-                        position_size_usd=spike.recommended_position_usd,
-                        shares_to_buy=spike.recommended_position_usd / spike.current_price,
-                        gross_profit=spike.recommended_position_usd * (spike.expected_roi_percent / 100),
-                        costs=spike.recommended_position_usd * 0.02,  # 2% vig
-                        net_profit=spike.recommended_position_usd * (spike.expected_roi_percent / 100) * 0.98,
-                        roi_percent=spike.expected_roi_percent,
-                        confidence_score=spike.confidence,
-                        event_timestamp=spike.detection_timestamp,
-                        detection_timestamp=spike.detection_timestamp,
-                        certainty_source='volume_spike',
+                        entry_price=spike.current_price,
+                        position_size=spike.recommended_position_usd,
+                        expected_roi=spike.expected_roi_percent,
+                        confidence=spike.confidence,
                         reasoning=spike.reasoning
                     )
-
-                    trade = self.trader.simulate_trade_entry(opp)
                     if trade:
                         executed += 1
                 else:

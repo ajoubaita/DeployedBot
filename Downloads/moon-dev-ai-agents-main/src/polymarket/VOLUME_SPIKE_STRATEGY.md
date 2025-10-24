@@ -24,15 +24,18 @@ When a market is about to resolve, insiders or informed traders often place larg
    - Persists volume history to disk
 
 2. **Volume Spike Bot** (`volume_spike_bot.py`)
-   - Monitors 199+ open markets continuously
+   - Monitors 418+ open markets continuously (all available markets)
+   - Optimized for high-frequency trading across all volume tiers
    - Uses Gamma API for real volume data
    - Executes trades in paper trading mode
    - Tracks P&L and performance
    - Runs 24/7 monitoring cycles
 
 3. **Real Data Integration**
-   - Connected to Gamma API: 199 markets with volume data
-   - Volume ranges: $643K - $24M per market
+   - Connected to Gamma API: 418+ markets with volume data
+   - High volume tier: 297 markets (>$100K)
+   - Target HFT range: 121 markets ($10K-$100K)
+   - Volume ranges: $10K - $24M per market
    - Markets include: Fed rate decisions, geopolitics, crypto events
    - All data is REAL, not mock
 
@@ -105,7 +108,7 @@ Expected ROI: 61% if resolves to $1.00
 4. **will-1-fed-rate-cut-happen-in-2025** - $2.6M volume
 5. **will-2-fed-rate-cuts-happen-in-2025** - $2.1M volume
 
-**Total**: 199 open markets being tracked
+**Total**: 418+ open markets being tracked (all available markets for HFT)
 
 ### Market Categories
 - **Economic**: Fed rates, recession indicators, inflation
@@ -130,8 +133,11 @@ python3 polymarket/run_5min.py
 **Expected Output**:
 ```
 Cycle #1:
-  ✓ 199 markets with volume data found
-  Scanning 199 markets for volume spikes...
+  ✓ 418 markets with volume data found
+    • High volume (>$100K): 297 markets
+    • Target range ($10K-$100K): 121 markets
+    • Total HFT targets: 418 markets
+  Scanning 418 markets for volume spikes...
   ✓ 0 volume spikes detected
 ```
 
@@ -253,7 +259,7 @@ Month 3 Active Period (Fed Meeting):
 ### Data Flow
 
 ```
-1. Gamma API → Fetch 199 markets with volume data
+1. Gamma API → Fetch 418+ markets with volume data (all available)
 2. Volume History → Store in rolling 20-snapshot window
 3. Spike Detection → Calculate volume_spike_ratio for each market
 4. Signal Strength → Combine volume + price + deadline
@@ -345,8 +351,11 @@ def calculate_signal_strength(volume_spike, price_change, deadline_proximity):
 
 ```
 [15:23:37] Fetching markets...
-  ✓ 199 markets with volume data found
-  Scanning 199 markets for volume spikes...
+  ✓ 418 markets with volume data found
+    • High volume (>$100K): 297 markets
+    • Target range ($10K-$100K): 121 markets
+    • Total HFT targets: 418 markets
+  Scanning 418 markets for volume spikes...
   ✓ 0 volume spikes detected
 
 SESSION STATISTICS:
