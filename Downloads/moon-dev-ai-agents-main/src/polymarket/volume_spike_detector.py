@@ -208,11 +208,13 @@ class VolumeSpikeDetector:
 
             # Get current price
             tokens = market.get('tokens', [])
-            if not tokens:
-                continue
+            if tokens and len(tokens) > 0:
+                # Use first token's price if available
+                price = tokens[0].get('price', 0.5)
+            else:
+                # Default to 0.5 (mid-point) if no price data
+                price = 0.5
 
-            # Use first token's price
-            price = tokens[0].get('price', 0.5)
             liquidity = market.get('liquidity', 0)
 
             # Get or create history tracker
